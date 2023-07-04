@@ -1,0 +1,243 @@
+# Written by ya boi Walter Lohmueller
+import math
+
+
+
+
+#ROBOT VARIABLES(change these based on your robot)
+mass = 59 #weight of the robot in kilograms (I do not apoligize for those of you that use imperial)
+wheel_radius = 75 #circumference of the wheel in mm
+throttle_speed = 1.9 # what we raise the throttle input to. The output is commanded as the motor speed.
+turning_radius = 343#the distance between each tread and the center of the robot in mm
+max_torque = 2.422 # the max torque of each motor in newton meters
+
+#We can change this based on what the drivers want
+
+
+
+#CONTROL SYSTEMS
+P_gain = 1
+D_gain = 0.5
+I_gain = 0.01
+integrator = 0
+
+
+
+#TARGET NODES
+#the robot traces path between all these nodes and follows said path
+#rn this is a test of how well the robot can follow a pre-programmed path
+#but you can maybe use this shit for auto idk lol
+node1x = 5000#x and y posistion of the first node, in mm
+node1y = 5000
+
+node2x = 5000
+node2y = 10000
+
+target_slope = 0
+target_angle = 0
+posx_error = 0 # these variables will be considered to decide weither to target the next node
+posy_error = 0
+
+
+
+
+
+
+
+#MOTOR VARIABLES
+throttle_input = 1 #amount of throttle being applied to the motors. Will be made adjustable in GUI
+#This simualation runs a tank style design. 4 motors total and 2 on each tread. Modeling each motor individually
+#allows me to add disturbances to each one.
+
+motor_torque1 = 0 #speed of the motor in rotations per minute
+motor_torque2 = 0
+motor_torque3 = 0
+motor_torque4 = 0
+
+gear_ratio = 10.75 #the gear ratio of the robot
+
+
+force_left = 0 # split motor torque into left and right component. 2 motors on each tread
+force_right = 0
+
+
+
+
+
+
+
+#TURNING VARIABLES
+force_difference = 0 #difference in the force of the right and left treads
+pi = 3.14159
+turning_circumference = 2 * pi * turning_radius
+turned_distance = 0
+angle_error = 0
+angle = 0 # the angle of the robot
+turn_accel = 0 # acceleration and velocity of the robot as it turns
+turn_vel = 0
+node_count = 0
+
+
+
+
+
+
+
+
+
+#POSISTION VARIABLES
+accelx = 0#acceleration of the robot on the X and Y axis
+accely = 0
+accel = 0#general acceleration of the robot
+
+velx = 0#velocity of the robot on the X and Y axis
+vely = 0
+vel = 0# general velocity of the robot
+
+posx = 0#posistion of the robot on the X and Y axis.
+posy = 0
+distance_traveled = 0 #overall distance traveled in one direction. This will be split up into it's x an y components
+
+
+
+
+
+
+
+#TIMING VARIABLES
+import time
+starttime = time.time()
+lasttime = time.time()
+present_time = 0
+previous_time = 0
+i = 0
+
+
+
+
+
+
+
+
+while i < 500: #start a loop
+    i = i + 1
+    time.sleep(0.1)
+    # CREATE TIMING IN THE LOOP
+    starttime = time.time()
+    present_time = starttime - lasttime
+    loop_time = present_time - previous_time  # tme it takes for each cycle of code to run
+    starttime = time.time()
+    previous_time = starttime - lasttime  # both previous and present time is a measure of how long it has
+    # been since the simulation began
+
+
+#PRINT EVERYTHING OUT
+    print(" angle error ", end="")
+    print(angle_error ,end="")
+    print("angle", end="")
+    print(angle, end="")
+    print(" turned distance ", end="")
+    print(turned_distance, end="")
+    print(" target angle ", end="")
+    print(target_angle, end="")
+    print(" target slope ", end="")
+    print(target_slope, end="")
+
+    print(" posistion y ", end="")
+    print(posy, end="")
+    print (" posistion x ", end="")
+    print(posx, end="") #convert to meters to make it easier to read
+    print( " loop_time ", end="")
+    print(loop_time)
+
+
+    #UPDATE TARGET NODE
+    if posx_error < 25 and posy_error < 25 and previous_time > 5:
+        node_count = 0
+        #update target nodes
+        node1x = node1x + (node2x - node1x)
+        node1y = node1y + (node2y - node2y)
+
+        # NODE PATHPLANNING
+        # this section of code just finds the shortest path between 2 nodes lol
+    if node_count == 0:
+        target_slope = (node1y - posy) / (node1x - posx)
+        target_angle = target_slope * 45
+        node_count = 1
+
+
+
+
+    angle_error = target_angle - angle
+    integrator = integrator + angle_error
+    force_difference = angle_error * P_gain
+    force_difference = force_difference - turn_vel * D_gain
+    force_difference = force_difference + integrator * I_gain
+
+
+    turn_accel = force_difference * 4 * gear_ratio / (wheel_radius/1000) / mass
+    turn_vel = turn_vel + turn_accel * loop_time
+    turned_distance = turned_distance + turn_vel * loop_time
+
+    angle = turned_distance / turning_circumference * 360
+    angle = target_angle # for troubleshooting
+
+
+
+
+
+
+
+
+     # TRANSFERING MOTOR SHAFT MOVEMENT TO THE ROBOT
+    motor_torque1 = max_torque  # rn we are not considering throttle inputs so turn it to eleven
+    motor_torque2 = max_torque
+    motor_torque3 = max_torque
+    motor_torque4 = max_torque
+
+    # I am currently averaging out the motor speeds on each tread cuz idfk a better way to do it lol
+    force_left = motor_torque1 + motor_torque2
+    force_right = motor_torque3 + motor_torque4
+
+    #this part is kinda sketch but right now the force on the robot is defined as the motor spee
+    accel = (force_left + force_right) * gear_ratio / (wheel_radius/1000) / mass
+    vel = accel * loop_time + vel
+    distance_traveled = vel * loop_time + distance_traveled
+
+    posy = math.sin(angle / 57.2958) * distance_traveled
+    posx = math.cos(angle / 57.2958) * distance_traveled
+
+
+
+
+
+
+
+
+
+
+
+
+
+#just so everyone is clear I am a bad at coding in python. Everything here is not the optimal way to code this
+#simulation. the math is correct though
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
